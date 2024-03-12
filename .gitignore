@@ -27,4 +27,4 @@ go.work
 *.env
 
 # # Ignore CMD
-# cmd/**
+cmd/**
