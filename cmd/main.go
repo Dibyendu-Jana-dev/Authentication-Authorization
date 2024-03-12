@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	err := godotenv.Load("dev.env")
+	err := godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file: " + err.Error())
 	}
