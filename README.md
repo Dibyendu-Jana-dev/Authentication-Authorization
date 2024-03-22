@@ -15,5 +15,6 @@ Here we implement Swagger for auto documentation generate
  swag init -g cmd/main.go
 then
  go run cmd/main.go
-
+# Run Swagger UI
+http://localhost:8080/swagger/index.html
 Note: Here we implement logger with Zap package
