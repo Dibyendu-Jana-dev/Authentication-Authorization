@@ -9,6 +9,7 @@ import (
 	"github.com/dibyendu/Authentication-Authorization/pkg/service"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"log"
 	"net/http"
 )
@@ -24,7 +25,9 @@ func StartApp(config *config.AppConfig) {
 
 	// Create a new router
 	router := mux.NewRouter()
-
+	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:8080/swagger/doc.json"), // The URL to fetch the Swagger JSON file
+	))
 	// Create a private router for authenticated routes
 	privateRouter := router.PathPrefix("/").Subrouter()
 
