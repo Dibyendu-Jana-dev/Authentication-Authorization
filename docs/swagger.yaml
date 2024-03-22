@@ -1,0 +1,158 @@
+basePath: /
+definitions:
+  dto.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      role:
+        type: string
+    type: object
+  dto.CreateUserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      role:
+        type: string
+    type: object
+  dto.GetUserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+    type: object
+  dto.UserLoginResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      token:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is the API documentation for the Authentication and Authorization
+    service.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Authentication and Authorization API
+  version: "2.0"
+paths:
+  /create-user:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user with the provided details
+      parameters:
+      - description: User details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/dto.CreateUserResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            type: string
+      summary: Create a new user
+      tags:
+      - Users
+  /user/get-user:
+    get:
+      consumes:
+      - application/json
+      description: Fetch details of a user by their ID
+      parameters:
+      - description: User ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User details fetched successfully
+          schema:
+            $ref: '#/definitions/dto.GetUserResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            type: string
+        "401":
+          description: Unauthorized access
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      - bearerToken: []
+      summary: Fetch user details
+      tags:
+      - Users
+  /user/sign-in:
+    post:
+      consumes:
+      - application/json
+      description: sign in a user with the provided details
+      parameters:
+      - description: login details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User login successfully
+          schema:
+            $ref: '#/definitions/dto.UserLoginResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            type: string
+      summary: signs in user
+      tags:
+      - SignInUser
+securityDefinitions:
+  bearerToken:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
