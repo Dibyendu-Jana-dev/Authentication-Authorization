@@ -16,7 +16,7 @@ type Config struct {
 func Init(redConfig *Config) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     redConfig.Host + ":" + redConfig.Port,
-		Password: "", //no password set
+		Password: redConfig.Password, //no password set
 		DB:       0,  //use default DB
 	})
 	_, err := client.Ping(context.Background()).Result()
