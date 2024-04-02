@@ -20,4 +20,4 @@ then
 http://localhost:8080/swagger/index.html
 Note: Here we implement logger with Zap package
 #prerequisites
-for running this service you need to install mongodb and redis must
+for running this service you need to install mongodb and redis must 12
