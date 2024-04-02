@@ -1,6 +1,7 @@
 # Technology Uses:-
   *Golang
   mongodb
+  redis
   #RestApi
   ZAP for log
   #jwt Authorization
@@ -18,3 +19,5 @@ then
 # Run Swagger UI
 http://localhost:8080/swagger/index.html
 Note: Here we implement logger with Zap package
+#prerequisites
+for running this service you need to install mongodb and redis must
