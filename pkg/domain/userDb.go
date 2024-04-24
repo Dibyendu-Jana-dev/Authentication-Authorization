@@ -2,179 +2,193 @@ package domain
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"time"
-
-	"github.com/dibyendu/Authentication-Authorization/lib/constants"
+	"encoding/csv"
+	"fmt"
 	"github.com/dibyendu/Authentication-Authorization/lib/errs"
 	"github.com/dibyendu/Authentication-Authorization/lib/logger"
 	"github.com/dibyendu/Authentication-Authorization/lib/utility"
-	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"os"
+	"strings"
 )
 
 type UserRepositoryDb struct {
-	client     *mongo.Client
-	redisClient *redis.Client
-	database   string
-	collection map[string]string
 }
 
-func NewUserRepositoryDb(dbClient *mongo.Client, redisClient *redis.Client, database string, collection map[string]string) UserRepositoryDb {
+func NewUserRepositoryDb() UserRepositoryDb {
 	return UserRepositoryDb{
-		client:      dbClient,
-		redisClient: redisClient,
-		database:    database,
-		collection:  collection,
-	}
-}
-
-func(n UserRepositoryDb) CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, *errs.AppError){
-	var(
-		filter = bson.M{}
-		data CreateUserResponse
-	)
-
-	filter = bson.M{
-		"name": request.Name,
-		"email": request.Email,
-	}
-	password, err := utility.HashPassword(request.Password)
-	if err != nil {
-		logger.Error("password hashing failed"+ err.Error())
-		return nil, errs.NewValidationError("password hashing failed"+ err.Error())
-	}
-	request.Password = password
-	err = n.client.Database(n.database).Collection(n.collection["user"]).FindOne(ctx, filter).Decode(&data)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			// If document doesn't exist, insert it
-			result, err := n.client.Database(n.database).Collection(n.collection["user"] ).InsertOne(ctx, request)
-			if err != nil {
-				logger.Error("error inserting user log: " + err.Error())
-				return nil,  errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
-			}
-			if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-				data.Id = oid
-				data.Name = request.Name
-				data.Role = request.Role
-				data.Email = request.Email
-			}
-			value, jErr := json.Marshal(data)
-			if jErr != nil {
-				logger.Error("error marshalling")
-				return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
-			}
-			_, err = n.redisClient.Set(ctx, data.Id.Hex(), value, time.Duration(5)*time.Minute).Result()
-			if err != nil {
-				logger.Error("error in set value to redis server for create user: "+err.Error())
-				return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
-			}
-			return &data, nil
-		}
-	}
-	return nil, &errs.AppError{
-		Code:    http.StatusConflict,
-		Message: constants.USER_ALREADY_EXISTS,
-	}
-}
-
-func (n UserRepositoryDb) SignIn(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, *errs.AppError) {
-	var (
-		filter = bson.M{}
-		data   CreateUserResponse
-	)
-
-	filter = bson.M{
-		"name":  request.Name,
-		"email": request.Email,
-	}
-	password, err := utility.HashPassword(request.Password)
-	if err != nil {
-		logger.Error("password hashing failed" + err.Error())
-		return nil, errs.NewValidationError("password hashing failed" + err.Error())
-	}
-	request.Password = password
-	err = n.client.Database(n.database).Collection(n.collection["user"]).FindOne(ctx, filter).Decode(&data)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			// If document doesn't exist, insert it
-			result, err := n.client.Database(n.database).Collection(n.collection["user"]).InsertOne(ctx, request)
-			if err != nil {
-				logger.Error("error inserting user log: " + err.Error())
-				return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
-			}
-			if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-				data.Id = oid
-				data.Name = request.Name
-				data.Role = request.Role
-				data.Email = request.Email
-			}
-			return &data, nil
-		}
-	}
-	return nil, &errs.AppError{
-		Code:    http.StatusConflict,
-		Message: constants.USER_ALREADY_EXISTS,
 	}
 }
 
 func (d UserRepositoryDb) IsEmailExists(ctx context.Context, email string) (*CreateUserResponse, *errs.AppError) {
 	var (
-		filter     = bson.M{}
 		userDetail CreateUserResponse
 	)
-	filter["email"] = email
-	result := d.client.Database(d.database).Collection(d.collection["user"]).FindOne(ctx, filter).Decode(&userDetail)
-	if result != nil {
-		if result == mongo.ErrNoDocuments {
-			logger.Warn("there is not exists this email: " + result.Error())
-			return nil, errs.NewNotFoundError("not found this email")
-		}
-		logger.Error("error fetching user log: " + result.Error())
-		return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
+
+	var users = []CreateUserRequest{
+		{"admin", "admin", "admin@gmail.com", "Admin@1234"},
+		{"user1", "user", "user1@gmail.com", "User1@1234"},
 	}
 
-	return &userDetail, nil
+	for _, u := range users {
+		if u.Email == email {
+			password, err := utility.HashPassword(u.Password)
+			if err != nil {
+				logger.Error("password hashing failed"+ err.Error())
+				return nil, errs.NewValidationError("password hashing failed"+ err.Error())
+			}
+			userDetail.Name = u.Name
+			userDetail.Role = u.Role
+			userDetail.Email = u.Email
+			userDetail.Password = password
+			return &userDetail, nil
+		}
+	}
+	return nil, errs.NewNotFoundError("User not found")
 }
 
-func(d UserRepositoryDb) GetUser(ctx context.Context, req GetUserRequest) (*GetUserResponse, *errs.AppError){
-	var(
-		filter = bson.M{}
-		userDetail GetUserResponse
-	)
-	val, err := d.redisClient.Get(ctx, req.Id).Result()
-	if err != nil {
-		logger.Error("error fetching user from redis: " + err.Error())
-		return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
-	}
-	if val == "" {
-		objectId, err := primitive.ObjectIDFromHex(req.Id)
+func (d UserRepositoryDb) GetBookList(ctx context.Context, userType string) ([]*GetUserBookListResponse, *errs.AppError) {
+	var books []*GetUserBookListResponse
+
+	if userType == "admin" {
+		books1, err := readBooksFromFile("regularUser.csv")
 		if err != nil {
-			logger.Error("error converting dtring to objectid: " +err.Error())
-			return nil, errs.NewValidationError("unable to convert id to objectId")
+			return nil, err
 		}
-		filter["_id"] = objectId
-		result := d.client.Database(d.database).Collection(d.collection["user"]).FindOne(ctx, filter).Decode(&userDetail)
-		if result != nil {
-			if result == mongo.ErrNoDocuments {
-				logger.Warn("there is not exists the user detail with this id: " + result.Error())
-				return nil, errs.NewNotFoundError("not found user details for this id")
-			}
-			logger.Error("error fetching user log: " + result.Error())
-			return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
+		books2, err := readBooksFromFile("adminUser.csv")
+		if err != nil {
+			return nil, err
 		}
-		return &userDetail, nil
+		books = append(books, books1...)
+		books = append(books, books2...)
 	} else {
-		var redisUser GetUserResponse
-		if err := json.Unmarshal([]byte(val), &redisUser); err != nil {
-			logger.Error("error unmarshalling user: " +err.Error())
-			return nil, errs.NewUnexpectedError(constants.UNEXPECTED_ERROR)
+		books1, err := readBooksFromFile("regularUser.csv")
+		if err != nil {
+			return nil, err
 		}
-		return &redisUser, nil
+		books = append(books, books1...)
 	}
-	//return &userDetail, nil
+
+	return books, nil
+}
+
+func readBooksFromFile(filename string) ([]*GetUserBookListResponse, *errs.AppError) {
+	var books []*GetUserBookListResponse
+
+	file, err := os.Open(filename)
+	if err != nil {
+		logger.Error("Failed to open file:"+ err.Error())
+		return nil, errs.NewUnexpectedError("Failed to open file")
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	lines, err := reader.ReadAll()
+	if err != nil {
+		logger.Error("Failed to read file:"+ err.Error())
+		return nil, errs.NewUnexpectedError("Failed to read file")
+	}
+
+	for i, line := range lines {
+		if i == 0 {
+			continue // Skip header
+		}
+		if len(line) >= 3 {
+			book := &GetUserBookListResponse{
+				BookName:        line[0],
+				Author:          line[1],
+				PublicationYear: line[2],
+			}
+			books = append(books, book)
+		}
+	}
+	return books, nil
+}
+
+func(n UserRepositoryDb) AddBook(ctx context.Context, req AddBookRequest) ([]*GetUserBookListResponse, *errs.AppError){
+	if err := addBookToCSV("regularUser.csv", strings.TrimSpace(req.BookName), req.Author, req.PublicationYear); err != nil {
+		return nil, errs.NewValidationError("Failed to add book to the file"+ err.Error())
+	}
+	return nil, nil
+}
+
+func addBookToCSV(filename, bookName, author string, publicationYear int) error {
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Move the file pointer to the end of the file
+	if _, err := file.Seek(0, os.SEEK_END); err != nil {
+		return err
+	}
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// Writing the new record to the CSV file
+	if err := writer.Write([]string{bookName, author, fmt.Sprintf("%d", publicationYear)}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d UserRepositoryDb) DeleteBook(ctx context.Context, bookName string) ([]*GetUserBookListResponse, *errs.AppError) {
+	err := deleteRowByBookName("regularUser.csv", bookName)
+	if err != nil {
+		return nil, errs.NewValidationError("error occurred while deleting")
+	}
+	return nil, nil
+}
+
+func deleteRowByBookName(filename string, bookName string) error {
+	// Open the CSV file
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Read the CSV file here
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return err
+	}
+
+	// case insensitive
+	var rowIndexToRemove = -1
+	bookNameLower := strings.ToLower(bookName)
+	for i, record := range records {
+		if len(record) >= 1 && strings.ToLower(record[0]) == bookNameLower {
+			rowIndexToRemove = i
+			break
+		}
+	}
+
+	if rowIndexToRemove == -1 {
+		return fmt.Errorf("book name '%s' not found", bookName)
+	}
+
+	// Remove the row
+	records = append(records[:rowIndexToRemove], records[rowIndexToRemove+1:]...)
+
+	// Write the updated records back to the CSV file
+	file, err = os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	for _, record := range records {
+		if err := writer.Write(record); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
