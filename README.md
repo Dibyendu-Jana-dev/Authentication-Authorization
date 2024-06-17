@@ -25,4 +25,4 @@ for running this service you need to install mongodb and redis must. also edit a
 # command
 for setting and saving password in redis you must follow this command like 'CONFIG SET requirepass your_password'
 
-thankyou and lots of love all from Dibyendu😎❤️👍
+thankyou and lots of love all from Dibyendu 😎❤️👍
