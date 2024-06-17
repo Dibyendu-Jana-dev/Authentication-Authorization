@@ -61,7 +61,6 @@ func Authentication(next http.Handler) http.Handler {
 		}()
 		setSecret()
 		authToken := r.Header.Get("Authorization")
-		contextMap.AuthToken = authToken
 		log.Println("Authentication", authToken)
 		split := strings.Split(authToken, " ")
 		if len(split) > 1 {
